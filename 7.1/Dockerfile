@@ -40,15 +40,31 @@ LABEL summary="${SUMMARY}" \
       usage="s2i build https://github.com/sclorg/s2i-php-container.git --context-dir=${PHP_VERSION}/test/test-app centos/${NAME}-${PHP_VER_SHORT}-centos7 sample-server" \
       maintainer="SoftwareCollections.org <sclorg@redhat.com>"
 
+# adding custom MS repository
+# RUN curl https://packages.microsoft.com/keys/microsoft.asc | rpm --import -
+# RUN rpm -i https://packages.microsoft.com/config/centos/7/packages-microsoft-prod.rpm
+
+RUN curl https://packages.microsoft.com/config/rhel/7/prod.repo > /etc/yum.repos.d/mssql-release.repo
+
 # Install Apache httpd and PHP
 RUN yum install -y centos-release-scl && \
-    INSTALL_PKGS="rh-php71 rh-php71-php rh-php71-php-mysqlnd rh-php71-php-pgsql rh-php71-php-bcmath \
+    INSTALL_PKGS="rh-php71 rh-php71-php-devel rh-php71-php rh-php71-php-mysqlnd rh-php71-php-pgsql rh-php71-php-bcmath \
                   rh-php71-php-gd rh-php71-php-intl rh-php71-php-ldap rh-php71-php-mbstring rh-php71-php-pdo \
                   rh-php71-php-process rh-php71-php-soap rh-php71-php-opcache rh-php71-php-xml \
-                  rh-php71-php-gmp rh-php71-php-pecl-apcu httpd24-mod_ssl" && \
-    yum install -y --setopt=tsflags=nodocs $INSTALL_PKGS --nogpgcheck && \
+                  rh-php71-php-gmp rh-php71-php-pecl-apcu httpd24-mod_ssl unixODBC-devel msodbcsql" && \
+    ACCEPT_EULA=Y yum install -y --setopt=tsflags=nodocs $INSTALL_PKGS --nogpgcheck && \
     rpm -V $INSTALL_PKGS && \
     yum clean all -y
+
+# install SQL Server PHP connector module 
+RUN pecl install sqlsrv pdo_sqlsrv
+
+# initial configuration of SQL Server PHP connector
+RUN chmod 755 /opt/rh/rh-php71/root/usr/lib64/php/modules/sqlsrv.so
+RUN chmod 755 /opt/rh/rh-php71/root/usr/lib64/php/modules/pdo_sqlsrv.so
+
+RUN echo "extension=sqlsrv.so" > /etc/opt/rh/rh-php71/php.d/30-pdo_sqlsrv.ini
+RUN echo "extension=pdo_sqlsrv.so" >> /etc/opt/rh/rh-php71/php.d/30-pdo_sqlsrv.ini
 
 ENV PHP_CONTAINER_SCRIPTS_PATH=/usr/share/container-scripts/php/ \
     APP_DATA=${APP_ROOT}/src \
